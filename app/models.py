@@ -25,7 +25,7 @@ class Book(db.Model):
     loans = db.relationship('Loan', backref='book', lazy=True)
 
     # Checking the constaints
-    table_args = (
+    __table_args__ = (
         db.CheckConstraint('total_copies >= 0', name='check_total_copies_non_negative'),
         db.CheckConstraint('available_copies >= 0', name='check_available_copies_non_negative'),
         # Available_copies may never exceed total_copies or drop below 0.
