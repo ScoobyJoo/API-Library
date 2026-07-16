@@ -8,6 +8,8 @@ class Category(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
     description = db.Column(db.Text, nullable=True)
 
+    books = db.relationship('Book', backref='category', lazy=True)
+
 class Book(db.Model):
     __tablename__ = 'books'
 
@@ -20,6 +22,16 @@ class Book(db.Model):
     available_copies = db.Column(db.Integer, nullable=False, default=0)
     published_year = db.Column(db.Integer, nullable=True)
 
+    loans = db.relationship('Loan', backref='book', lazy=True)
+
+    # Checking the constaints
+    table_args = (
+        db.CheckConstraint('total_copies >= 0', name='check_total_copies_non_negative'),
+        db.CheckConstraint('available_copies >= 0', name='check_available_copies_non_negative'),
+        # Available_copies may never exceed total_copies or drop below 0.
+        db.CheckConstraint('available_copies <= total_copies', name='check_available_copies_not_exceed_total')
+    )
+
 class Customer(db.Model):
     __tablename__ = 'customers'
 
@@ -29,6 +41,8 @@ class Customer(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False)
     phone = db.Column(db.String(30), nullable=True)
     membership_date = db.Column(db.Date, nullable=False, default=date.today)
+
+    loans = db.relationship('Loan', backref='customer', lazy=True)
 
 class Loan(db.Model):
     __tablename__ = 'loans'
