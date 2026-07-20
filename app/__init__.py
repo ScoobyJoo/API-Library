@@ -13,8 +13,11 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
-        from app import models 
-    
+        from app import models
+
+    from app.routes.categories import categories_bp
+    app.register_blueprint(categories_bp)
+
     @app.route("/health", methods=["GET"])
     def health_check():
         return {"status": "healthy"}

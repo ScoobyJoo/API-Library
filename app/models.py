@@ -10,6 +10,14 @@ class Category(db.Model):
 
     books = db.relationship('Book', backref='category', lazy=True)
 
+    # Method to convert the model instance to a dictionary for easy serialization
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+        }
+
 class Book(db.Model):
     __tablename__ = 'books'
 
@@ -32,6 +40,18 @@ class Book(db.Model):
         db.CheckConstraint('available_copies <= total_copies', name='check_available_copies_not_exceed_total')
     )
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "author": self.author,
+            "isbn": self.isbn,
+            "category_id": self.category_id,
+            "total_copies": self.total_copies,
+            "available_copies": self.available_copies,
+            "published_year": self.published_year,
+        }
+
 class Customer(db.Model):
     __tablename__ = 'customers'
 
@@ -43,6 +63,16 @@ class Customer(db.Model):
     membership_date = db.Column(db.Date, nullable=False, default=date.today)
 
     loans = db.relationship('Loan', backref='customer', lazy=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "email": self.email,
+            "phone": self.phone,
+            "membership_date": self.membership_date.isoformat(),
+        }
 
 class Loan(db.Model):
     __tablename__ = 'loans'
