@@ -84,3 +84,14 @@ class Loan(db.Model):
     due_date = db.Column(db.Date, nullable=False, default=lambda: date.today() + timedelta(days=14))
     return_date = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(20), nullable=False) # Active, Returned, Overdue
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "book_id": self.book_id,
+            "customer_id": self.customer_id,
+            "checkout_date": self.checkout_date.isoformat(),
+            "due_date": self.due_date.isoformat(),
+            "return_date": self.return_date.isoformat() if self.return_date else None,
+            "status": self.status,
+        }
