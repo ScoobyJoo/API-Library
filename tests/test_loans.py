@@ -17,6 +17,7 @@ def setup_book_and_customer(client, total_copies=1):
     return book, customer
 
 
+# Checking out a book creates an active loan and decrements available_copies
 def test_checkout_book_decrements_available_copies(client):
     book, customer = setup_book_and_customer(client, total_copies=3)
 
@@ -31,23 +32,27 @@ def test_checkout_book_decrements_available_copies(client):
     assert updated_book["available_copies"] == 2
 
 
+# Blocks checking out without book_id/customer_id
 def test_checkout_missing_fields(client):
     resp = client.post("/loans", json={})
     assert resp.status_code == 400
 
 
+# Blocks checking out a book that doesn't exist
 def test_checkout_unknown_book(client):
     _, customer = setup_book_and_customer(client)
     resp = client.post("/loans", json={"book_id": 999, "customer_id": customer["id"]})
     assert resp.status_code == 404
 
 
+# Blocks checking out to a customer that doesn't exist
 def test_checkout_unknown_customer(client):
     book, _ = setup_book_and_customer(client)
     resp = client.post("/loans", json={"book_id": book["id"], "customer_id": 999})
     assert resp.status_code == 404
 
 
+# Blocks checkout when no copies are available
 def test_checkout_no_available_copies(client):
     book, customer = setup_book_and_customer(client, total_copies=1)
     client.post("/loans", json={"book_id": book["id"], "customer_id": customer["id"]})
@@ -60,6 +65,7 @@ def test_checkout_no_available_copies(client):
     assert resp.status_code == 409
 
 
+# Returning a book marks the loan returned and increments available_copies
 def test_return_book_increments_available_copies(client):
     book, customer = setup_book_and_customer(client, total_copies=1)
     loan = client.post("/loans", json={"book_id": book["id"], "customer_id": customer["id"]}).get_json()
@@ -74,11 +80,13 @@ def test_return_book_increments_available_copies(client):
     assert updated_book["available_copies"] == 1
 
 
+# Test that returning a loan that does not exist returns a 404
 def test_return_loan_not_found(client):
     resp = client.post("/loans/999/return")
     assert resp.status_code == 404
 
 
+# Blocks returning a loan that's already been returned
 def test_return_already_returned_loan(client):
     book, customer = setup_book_and_customer(client)
     loan = client.post("/loans", json={"book_id": book["id"], "customer_id": customer["id"]}).get_json()
@@ -88,6 +96,7 @@ def test_return_already_returned_loan(client):
     assert resp.status_code == 409
 
 
+# Filters the loan list down to a single customer's loans
 def test_list_loans_filter_by_customer_id(client):
     book, customer = setup_book_and_customer(client, total_copies=2)
     other_customer = client.post(
@@ -104,6 +113,7 @@ def test_list_loans_filter_by_customer_id(client):
     assert body[0]["customer_id"] == customer["id"]
 
 
+# Filters the loan list down to active or returned loans
 def test_list_loans_filter_by_status(client):
     book, customer = setup_book_and_customer(client, total_copies=1)
     loan = client.post("/loans", json={"book_id": book["id"], "customer_id": customer["id"]}).get_json()
@@ -116,6 +126,7 @@ def test_list_loans_filter_by_status(client):
     assert returned[0]["id"] == loan["id"]
 
 
+# Create a loan and fetch it by ID
 def test_get_loan_by_id(client):
     book, customer = setup_book_and_customer(client)
     loan = client.post("/loans", json={"book_id": book["id"], "customer_id": customer["id"]}).get_json()
@@ -125,6 +136,7 @@ def test_get_loan_by_id(client):
     assert resp.get_json()["id"] == loan["id"]
 
 
+# Test fetching a loan that does not exist returns 404
 def test_get_loan_not_found(client):
     resp = client.get("/loans/999")
     assert resp.status_code == 404
