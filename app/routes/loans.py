@@ -3,9 +3,10 @@ from flask import Blueprint, jsonify, request
 from app.db import db
 from app.models import Book, Customer, Loan
 
-loans_bp = Blueprint("loans", __name__)
+loans_bp = Blueprint("loans", __name__, url_prefix='/api/loans')
 
-@loans_bp.post("/loans")
+# Create a loan
+@loans_bp.route("", methods=["POST"])
 def checkout_book():
     data = request.get_json(silent=True) or {}
     book_id = data.get("book_id")
@@ -38,8 +39,8 @@ def checkout_book():
     db.session.commit()
     return jsonify(loan.to_dict()), 201
 
-
-@loans_bp.post("/loans/<int:loan_id>/return")
+# Return a loan
+@loans_bp.route("/<int:loan_id>/return", methods=["POST"])
 def return_book(loan_id):
     loan = Loan.query.get(loan_id)
     if not loan:
@@ -60,8 +61,8 @@ def return_book(loan_id):
     db.session.commit()
     return jsonify(loan.to_dict())
 
-
-@loans_bp.get("/loans")
+# List loans with optional filters
+@loans_bp.route("", methods=["GET"])
 def list_loans():
     query = Loan.query
 
@@ -75,8 +76,8 @@ def list_loans():
 
     return jsonify([l.to_dict() for l in query.all()])
 
-
-@loans_bp.get("/loans/<int:loan_id>")
+# Get a specific loan
+@loans_bp.route("/<int:loan_id>", methods=["GET"])
 def get_loan(loan_id):
     loan = Loan.query.get(loan_id)
     if not loan:

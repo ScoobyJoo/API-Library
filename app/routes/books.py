@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import IntegrityError
-from app.models import Book, Category
+from app.models import Book, Category, Loan
 from app.db import db
 
 books_bp = Blueprint('books', __name__, url_prefix='/api/books')
@@ -123,12 +123,16 @@ def delete_book(book_id):
     if book is None:
         return jsonify({"error": "Book not found"}), 404
 
+    has_active_loan = db.session.query(Loan.id).filter(
+        Loan.book_id == book_id,
+        Loan.status != 'returned',
+    ).first() is not None
+    current_app.logger.debug("book %s has_active_loan=%s", book_id, has_active_loan)
+    if has_active_loan:
+        return jsonify({"error": "Cannot delete a book that has active loans"}), 409
+
+    Loan.query.filter_by(book_id=book_id).delete()
     db.session.delete(book)
-    try:
-        db.session.commit()
-        # Check for existing loans referencing this book
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({"error": "Cannot delete a book that has existing loans"}), 409
+    db.session.commit()
 
     return '', 204

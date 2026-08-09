@@ -1,0 +1,50 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<section>
+    <h2>Check Out a Book</h2>
+    <form id="checkout-form">
+        <div>
+            <label for="book">Book</label>
+            <select id="book" required></select>
+        </div>
+        <div>
+            <label for="customer">Customer</label>
+            <select id="customer" required></select>
+        </div>
+        <button type="submit">Check Out</button>
+    </form>
+    <p id="loan-status"></p>
+</section>
+
+<section>
+    <h2>Loans</h2>
+    <div>
+        <label for="status-filter">Filter by status</label>
+        <select id="status-filter">
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="returned">Returned</option>
+            <option value="overdue">Overdue</option>
+        </select>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Book</th>
+                <th>Customer</th>
+                <th>Checkout Date</th>
+                <th>Due Date</th>
+                <th>Return Date</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="loans-table-body"></tbody>
+    </table>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='admin/loans.js') }}" defer></script>
+{% endblock %}

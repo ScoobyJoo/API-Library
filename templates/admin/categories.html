@@ -1,0 +1,39 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<section>
+    <h2 id="form-heading">Create a New Category</h2>
+    <form id="add-category-form">
+        <input type="hidden" id="category-id" value="">
+        <div>
+            <label for="name">Name</label>
+            <input type="text" id="name" required>
+        </div>
+        <div>
+            <label for="description">Description</label>
+            <input type="text" id="description">
+        </div>
+        <button type="submit" id="form-submit-btn">Add Category</button>
+        <button type="button" id="cancel-edit-btn" style="display: none;">Cancel</button>
+    </form>
+    <p id="category-status"></p>
+</section>
+
+<section>
+    <h2>Categories</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="categories-table-body"></tbody>
+    </table>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='admin/categories.js') }}" defer></script>
+{% endblock %}

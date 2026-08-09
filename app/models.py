@@ -83,7 +83,7 @@ class Loan(db.Model):
     checkout_date = db.Column(db.Date, nullable=False, default=date.today)
     due_date = db.Column(db.Date, nullable=False, default=lambda: date.today() + timedelta(days=14))
     return_date = db.Column(db.Date, nullable=True)
-    status = db.Column(db.String(20), nullable=False) # Active, Returned, Overdue
+    status = db.Column(db.String(20), nullable=False) # active, returned, overdue (lowercase)
 
     def to_dict(self):
         return {
