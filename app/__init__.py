@@ -1,5 +1,6 @@
 import logging
 import os
+import secrets
 from flask import Flask, redirect, render_template, url_for
 from app.db import db
 
@@ -16,6 +17,23 @@ def create_app(test_config=None):
 
     if test_config:
         app.config.update(test_config)
+
+    # Signs the session cookie; must be a real secret (env var) in any shared/production environment.
+    if not app.config.get('SECRET_KEY'):
+        secret_key = os.environ.get('SECRET_KEY')
+        if not secret_key:
+            if app.debug:
+                secret_key = secrets.token_hex(32)
+                app.logger.warning(
+                    "SECRET_KEY is not set; generated a random ephemeral key for this "
+                    "process. Sessions will not persist across restarts. Set the "
+                    "SECRET_KEY environment variable to fix this."
+                )
+            else:
+                raise RuntimeError(
+                    "SECRET_KEY environment variable must be set when not running in debug mode."
+                )
+        app.config['SECRET_KEY'] = secret_key
 
     db.init_app(app)
 
@@ -34,13 +52,16 @@ def create_app(test_config=None):
     from app.routes.loans import loans_bp
     app.register_blueprint(loans_bp)
 
+    from app.routes.auth import auth_bp
+    app.register_blueprint(auth_bp)
+
     @app.route("/health", methods=["GET"])
     def health_check():
         return {"status": "healthy"}
 
     @app.route("/", methods=["GET"])
     def index():
-        return render_template("index.html")
+        return render_template("user.html")
 
     @app.route("/admin", methods=["GET"])
     def admin_root():

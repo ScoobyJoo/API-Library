@@ -8,18 +8,21 @@ const categoriesTableBody = document.getElementById('categories-table-body');
 
 let categories = [];
 
+// Function to escape HTML special characters 
 function escapeHtml(value) {
     const div = document.createElement('div');
     div.textContent = value ?? '';
     return div.innerHTML;
 }
 
+// Function to load categories from the API and render them in the table
 async function loadCategories() {
     const response = await fetch('/api/categories');
     categories = await response.json();
     renderCategoriesTable();
 }
 
+// Function to render the categories table with the current list of categories
 function renderCategoriesTable() {
     categoriesTableBody.innerHTML = categories.map(category => `
         <tr>
@@ -33,6 +36,7 @@ function renderCategoriesTable() {
     `).join('');
 }
 
+// Function to start editing a category by populating the form with its data
 function startEdit(category) {
     categoryIdField.value = category.id;
     document.getElementById('name').value = category.name;
@@ -44,6 +48,7 @@ function startEdit(category) {
     status.textContent = '';
 }
 
+// Function to reset the form to its initial state
 function resetForm() {
     form.reset();
     categoryIdField.value = '';
@@ -52,6 +57,7 @@ function resetForm() {
     cancelBtn.style.display = 'none';
 }
 
+// Function to handle form submission for adding or editing a category
 async function submitCategory(event) {
     event.preventDefault();
     status.textContent = '';
@@ -84,6 +90,7 @@ async function submitCategory(event) {
     loadCategories();
 }
 
+// Function to delete a category by its ID
 async function deleteCategory(categoryId) {
     status.textContent = '';
 
@@ -102,6 +109,7 @@ async function deleteCategory(categoryId) {
     loadCategories();
 }
 
+// Function to handle clicks on the categories table for edit and delete actions
 categoriesTableBody.addEventListener('click', (event) => {
     const editId = event.target.dataset.edit;
     const deleteId = event.target.dataset.delete;

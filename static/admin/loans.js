@@ -8,12 +8,14 @@ const loansTableBody = document.getElementById('loans-table-body');
 let booksById = {};
 let customersById = {};
 
+// Function to escape HTML special characters 
 function escapeHtml(value) {
     const div = document.createElement('div');
     div.textContent = value ?? '';
     return div.innerHTML;
 }
 
+// Function to load books from the API and populate the book select dropdown
 async function loadBooks() {
     const response = await fetch('/api/books');
     const books = await response.json();
@@ -23,6 +25,7 @@ async function loadBooks() {
         .join('');
 }
 
+// Function to load customers from the API and populate the customer select dropdown
 async function loadCustomers() {
     const response = await fetch('/api/customers');
     const customers = await response.json();
@@ -32,6 +35,7 @@ async function loadCustomers() {
         .join('');
 }
 
+// Function to load loans from the API and render them in the table
 async function loadLoans() {
     const params = statusFilter.value ? `?status=${encodeURIComponent(statusFilter.value)}` : '';
     const response = await fetch(`/api/loans${params}`);
@@ -39,6 +43,7 @@ async function loadLoans() {
     renderLoansTable(loans);
 }
 
+// Function to render the loans table with the current list of loans
 function renderLoansTable(loans) {
     loansTableBody.innerHTML = loans.map(loan => {
         const book = booksById[loan.book_id];
@@ -62,6 +67,7 @@ function renderLoansTable(loans) {
     }).join('');
 }
 
+// Function to handle the checkout of a book to a customer
 async function checkoutBook(event) {
     event.preventDefault();
     status.textContent = '';
@@ -88,6 +94,7 @@ async function checkoutBook(event) {
     await loadLoans();
 }
 
+// Function to mark a loan as returned
 async function returnLoan(loanId) {
     status.textContent = '';
 
@@ -104,6 +111,7 @@ async function returnLoan(loanId) {
     await loadLoans();
 }
 
+// Function to handle clicks on the loans table for returning books
 loansTableBody.addEventListener('click', (event) => {
     const returnId = event.target.dataset.return;
     if (returnId) {

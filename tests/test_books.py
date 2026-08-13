@@ -132,7 +132,7 @@ def test_delete_book_with_active_loan_is_blocked(client):
         "/api/customers",
         json={"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.com"},
     ).get_json()
-    client.post("/loans", json={"book_id": book["id"], "customer_id": customer["id"]})
+    client.post("/api/loans", json={"book_id": book["id"], "customer_id": customer["id"]})
 
     respond = client.delete(f"/api/books/{book['id']}")
     assert respond.status_code == 409

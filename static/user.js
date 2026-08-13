@@ -1,8 +1,18 @@
 const loginSection = document.getElementById('login-section');
 const loginForm = document.getElementById('login-form');
-const usernameInput = document.getElementById('username');
+const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const loginStatus = document.getElementById('login-status');
+const showRegisterLink = document.getElementById('show-register');
+
+const registerSection = document.getElementById('register-section');
+const registerForm = document.getElementById('register-form');
+const regFirstNameInput = document.getElementById('reg-first-name');
+const regLastNameInput = document.getElementById('reg-last-name');
+const regEmailInput = document.getElementById('reg-email');
+const regPasswordInput = document.getElementById('reg-password');
+const registerStatus = document.getElementById('register-status');
+const showLoginLink = document.getElementById('show-login');
 
 const appContent = document.getElementById('app-content');
 const welcomeMessage = document.getElementById('welcome-message');
@@ -29,29 +39,66 @@ async function login(event) {
     event.preventDefault();
     loginStatus.textContent = '';
 
-    const username = usernameInput.value.trim().toLowerCase();
-    const password = passwordInput.value.trim().toLowerCase();
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: emailInput.value,
+                password: passwordInput.value,
+            }),
+        });
+        const data = await response.json();
 
-    // Not real auth
-    const response = await fetch('/api/customers');
-    const customers = await response.json();
-    const match = customers.find(c => {
-        const firstName = c.first_name.trim().toLowerCase();
-        const lastName = c.last_name.trim().toLowerCase();
-        return firstName === username && lastName === password;
-    });
+        if (!response.ok) {
+            loginStatus.textContent = data.error || 'Invalid email or password.';
+            return;
+        }
 
-    // Invalid login will print error message
-    if (!match) {
-        loginStatus.textContent = 'Invalid username or password.';
-        return;
+        loginForm.reset();
+        await enterApp(data);
+    } catch (err) {
+        loginStatus.textContent = 'Something went wrong. Please try again.';
     }
+}
 
-    currentCustomer = match;
-    loginForm.reset();
+// Function to handle new account registration
+async function registerCustomer(event) {
+    event.preventDefault();
+    registerStatus.textContent = '';
+
+    try {
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                first_name: regFirstNameInput.value,
+                last_name: regLastNameInput.value,
+                email: regEmailInput.value,
+                password: regPasswordInput.value,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            registerStatus.textContent = data.error || 'Could not create an account.';
+            return;
+        }
+
+        registerForm.reset();
+        await enterApp(data);
+    } catch (err) {
+        registerStatus.textContent = 'Something went wrong. Please try again.';
+    }
+}
+
+// Function to enter the main application after successful login or registration
+async function enterApp(customer) {
+    currentCustomer = customer;
     loginSection.hidden = true;
+    registerSection.hidden = true;
     appContent.hidden = false;
-    welcomeMessage.textContent = `Logged in as ${match.first_name} ${match.last_name}`;
+    welcomeMessage.textContent = `Logged in as ${customer.first_name} ${customer.last_name}`;
 
     await loadCategories();
     await loadBooks();
@@ -59,26 +106,54 @@ async function login(event) {
 }
 
 // Function to handle user logout
-function logout() {
-    currentCustomer = null;
-    appContent.hidden = true;
-    loginSection.hidden = false;
+async function logout() {
     status.textContent = '';
     loginStatus.textContent = '';
+
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+        loginStatus.textContent = 'Something went wrong. Please try again.';
+    }
+
+    currentCustomer = null;
+    appContent.hidden = true;
+    registerSection.hidden = true;
+    loginSection.hidden = false;
+}
+
+// Restores an existing session without re-prompting for credentials
+async function restoreSession() {
+    try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+            await enterApp(await response.json());
+        }
+    } catch (err) {
+        loginStatus.textContent = 'Something went wrong. Please try again.';
+    }
 }
 
 // Function to load categories
 async function loadCategories() {
-    const response = await fetch('/api/categories');
-    const categories = await response.json();
-    categoriesById = Object.fromEntries(categories.map(c => [c.id, c.name]));
+    try {
+        const response = await fetch('/api/categories');
+        const categories = await response.json();
+        categoriesById = Object.fromEntries(categories.map(c => [c.id, c.name]));
+    } catch (err) {
+        status.textContent = 'Something went wrong. Please try again.';
+    }
 }
 
 // Function to load books
 async function loadBooks() {
-    const response = await fetch('/api/books');
-    books = await response.json();
-    renderBooksTable();
+    try {
+        const response = await fetch('/api/books');
+        books = await response.json();
+        renderBooksTable();
+    } catch (err) {
+        status.textContent = 'Something went wrong. Please try again.';
+    }
 }
 
 // Function to render the books table with the current list of books
@@ -110,23 +185,27 @@ async function loadMyLoans() {
         return;
     }
 
-    const response = await fetch(`/api/loans?customer_id=${encodeURIComponent(currentCustomer.id)}`);
-    const loans = await response.json();
-    const myLoans = loans.filter(loan => loan.status !== 'returned');
-    const booksById = Object.fromEntries(books.map(b => [b.id, b]));
+    try {
+        const response = await fetch(`/api/loans?customer_id=${encodeURIComponent(currentCustomer.id)}`);
+        const loans = await response.json();
+        const myLoans = loans.filter(loan => loan.status !== 'returned');
+        const booksById = Object.fromEntries(books.map(b => [b.id, b]));
 
-    loansTableBody.innerHTML = myLoans.map(loan => {
-        const book = booksById[loan.book_id];
-        return `
-            <tr>
-                <td>${book ? escapeHtml(book.title) : `book ${loan.book_id}`}</td>
-                <td>${escapeHtml(loan.checkout_date)}</td>
-                <td>${escapeHtml(loan.due_date)}</td>
-                <td>${escapeHtml(loan.status)}</td>
-                <td><button type="button" data-return="${loan.id}">Return</button></td>
-            </tr>
-        `;
-    }).join('');
+        loansTableBody.innerHTML = myLoans.map(loan => {
+            const book = booksById[loan.book_id];
+            return `
+                <tr>
+                    <td>${book ? escapeHtml(book.title) : `book ${loan.book_id}`}</td>
+                    <td>${escapeHtml(loan.checkout_date)}</td>
+                    <td>${escapeHtml(loan.due_date)}</td>
+                    <td>${escapeHtml(loan.status)}</td>
+                    <td><button type="button" data-return="${loan.id}">Return</button></td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        status.textContent = 'Something went wrong. Please try again.';
+    }
 }
 
 // Function to handle the checkout of a book to the current user
@@ -137,38 +216,46 @@ async function checkoutBook(bookId) {
         return;
     }
 
-    const response = await fetch('/api/loans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: bookId, customer_id: currentCustomer.id }),
-    });
-    const data = await response.json();
+    try {
+        const response = await fetch('/api/loans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ book_id: bookId, customer_id: currentCustomer.id }),
+        });
+        const data = await response.json();
 
-    if (!response.ok) {
-        status.textContent = `Error: ${data.error}`;
-        return;
+        if (!response.ok) {
+            status.textContent = `Error: ${data.error}`;
+            return;
+        }
+
+        status.textContent = 'Book checked out.';
+        await loadBooks();
+        await loadMyLoans();
+    } catch (err) {
+        status.textContent = 'Something went wrong. Please try again.';
     }
-
-    status.textContent = 'Book checked out.';
-    await loadBooks();
-    await loadMyLoans();
 }
 
 // Function to handle the return of a loan by its ID
 async function returnLoan(loanId) {
     status.textContent = '';
 
-    const response = await fetch(`/api/loans/${loanId}/return`, { method: 'POST' });
-    const data = await response.json();
+    try {
+        const response = await fetch(`/api/loans/${loanId}/return`, { method: 'POST' });
+        const data = await response.json();
 
-    if (!response.ok) {
-        status.textContent = `Error: ${data.error}`;
-        return;
+        if (!response.ok) {
+            status.textContent = `Error: ${data.error}`;
+            return;
+        }
+
+        status.textContent = 'Book returned.';
+        await loadBooks();
+        await loadMyLoans();
+    } catch (err) {
+        status.textContent = 'Something went wrong. Please try again.';
     }
-
-    status.textContent = 'Book returned.';
-    await loadBooks();
-    await loadMyLoans();
 }
 
 // Event listeners for user interactions
@@ -190,6 +277,21 @@ loansTableBody.addEventListener('click', (event) => {
 // Event listeners for search input
 searchInput.addEventListener('input', renderBooksTable);
 
-// Event listeners for login and logout
+// Event listeners for login, registration, and logout
 loginForm.addEventListener('submit', login);
+registerForm.addEventListener('submit', registerCustomer);
 logoutBtn.addEventListener('click', logout);
+
+showRegisterLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    loginSection.hidden = true;
+    registerSection.hidden = false;
+});
+
+showLoginLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    registerSection.hidden = true;
+    loginSection.hidden = false;
+});
+
+restoreSession();
