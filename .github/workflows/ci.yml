@@ -1,0 +1,23 @@
+name: CI
+
+# Runs the test suite on every push and pull request against main/beta.
+# Purely local to GitHub's runners - no AWS access, no secrets needed.
+on:
+  push:
+    branches: [main, beta]
+  pull_request:
+    branches: [main, beta]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"   # matches the Dockerfile's python:3.11-slim
+
+      - run: pip install -r requirements-dev.txt
+
+      - run: python -m pytest

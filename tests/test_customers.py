@@ -100,7 +100,7 @@ def test_delete_customer_with_active_loan_is_blocked(client):
         },
     ).get_json()
     customer = create_customer(client).get_json()
-    client.post("/loans", json={"book_id": book["id"], "customer_id": customer["id"]})
+    client.post("/api/loans", json={"book_id": book["id"], "customer_id": customer["id"]})
 
     respond = client.delete(f"/api/customers/{customer['id']}")
     assert respond.status_code == 409

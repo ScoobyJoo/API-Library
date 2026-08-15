@@ -1,0 +1,26 @@
+name: Deploy
+
+# Only deploys from main - pushes to beta or any other branch don't
+# trigger this. Requires two GitHub Secrets to be set first (see
+# DEPLOYMENT.md): EC2_SSH_PRIVATE_KEY and EC2_HOST.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # mostly for a readable log entry - the actual
+                                     # deploy pulls fresh code on the server itself, below
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/ec2-user/API-Library
+            git pull
+            docker compose up -d --build

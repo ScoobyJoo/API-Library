@@ -1,0 +1,17 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+# .terraform.lock.hcl is intentionally NOT ignored - it pins exact provider
+# versions/checksums so `terraform init` is reproducible across machines.
+# HashiCorp recommends committing it.
+
+# Python
+__pycache__/
+*.pyc
+venv/
+instance/
+
+# Env
+.env

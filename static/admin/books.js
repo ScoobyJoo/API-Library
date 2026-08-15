@@ -10,12 +10,14 @@ const booksTableBody = document.getElementById('books-table-body');
 let categoriesById = {};
 let books = [];
 
+// Function to escape HTML special characters
 function escapeHtml(value) {
     const div = document.createElement('div');
     div.textContent = value ?? '';
     return div.innerHTML;
 }
 
+// Function to load categories from the API and populate the category select dropdown
 async function loadCategories() {
     const response = await fetch('/api/categories');
     const categories = await response.json();
@@ -25,12 +27,14 @@ async function loadCategories() {
         .join('');
 }
 
+// Function to load books from the API and render them in the table
 async function loadBooks() {
     const response = await fetch('/api/books');
     books = await response.json();
     renderBooksTable();
 }
 
+// Function to render the books table with the current list of books
 function renderBooksTable() {
     booksTableBody.innerHTML = books.map(book => `
         <tr>
@@ -49,6 +53,7 @@ function renderBooksTable() {
     `).join('');
 }
 
+// Function to start editing a book by populating the form with its data
 function startEdit(book) {
     bookIdField.value = book.id;
     document.getElementById('title').value = book.title;
@@ -64,6 +69,7 @@ function startEdit(book) {
     status.textContent = '';
 }
 
+// Function to reset the form to its initial state
 function resetForm() {
     form.reset();
     bookIdField.value = '';
@@ -72,6 +78,7 @@ function resetForm() {
     cancelBtn.style.display = 'none';
 }
 
+// Function to handle form submission for adding or editing a book
 async function submitBook(event) {
     event.preventDefault();
     status.textContent = '';
@@ -110,6 +117,7 @@ async function submitBook(event) {
     loadBooks();
 }
 
+// Function to delete a book by its ID
 async function deleteBook(bookId) {
     status.textContent = '';
 
@@ -128,6 +136,7 @@ async function deleteBook(bookId) {
     loadBooks();
 }
 
+// Function that handles clicks on the books table
 booksTableBody.addEventListener('click', (event) => {
     const editId = event.target.dataset.edit;
     const deleteId = event.target.dataset.delete;

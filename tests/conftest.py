@@ -7,6 +7,8 @@ from app import create_app
 from app.db import db
 from app.models import Book, Category, Customer
 
+CUSTOMER_PASSWORD = "password123"
+
 
 @pytest.fixture()
 def app():
@@ -15,6 +17,7 @@ def app():
     flask_app = create_app({
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
+        "SECRET_KEY": "test-secret-key",
     })
 
     with flask_app.app_context():
@@ -75,6 +78,7 @@ def customer(app):
             email="ada@example.com",
             phone="555-1234",
         )
+        customer.set_password(CUSTOMER_PASSWORD)
         db.session.add(customer)
         db.session.commit()
         yield customer

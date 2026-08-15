@@ -1,4 +1,5 @@
 from datetime import datetime, date, timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
 from app.db import db
 
 class Category(db.Model):
@@ -59,10 +60,19 @@ class Customer(db.Model):
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(30), nullable=True)
     membership_date = db.Column(db.Date, nullable=False, default=date.today)
 
     loans = db.relationship('Loan', backref='customer', lazy=True)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
         return {
