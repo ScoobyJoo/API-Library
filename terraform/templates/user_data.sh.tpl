@@ -34,6 +34,19 @@ curl -SL "https://github.com/docker/compose/releases/latest/download/docker-comp
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
+# --- 3b. Install a current Buildx CLI plugin ---
+# `docker compose up --build` delegates the actual image build to Buildx,
+# not to the older classic `docker build`. Recent Compose plugin versions
+# require Buildx >= 0.17.0, but AL2023's base `docker` package (installed
+# above) bundles one too old to satisfy that - without this step, any
+# `--build` fails with "compose build requires buildx 0.17.0 or later".
+# Buildx's release assets are named with the version in the filename (unlike
+# Compose's), so the latest tag has to be looked up first.
+BUILDX_VERSION=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest | grep '"tag_name":' | cut -d'"' -f4)
+curl -SL "https://github.com/docker/buildx/releases/download/$${BUILDX_VERSION}/buildx-$${BUILDX_VERSION}.linux-amd64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
 # --- 4. Clone the app repo ---
 sudo -u ec2-user git clone ${repo_url} /home/ec2-user/${project_dir}
 
