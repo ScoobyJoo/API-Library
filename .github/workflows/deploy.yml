@@ -10,6 +10,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Gates this job on the "production" GitHub Environment (Settings ->
+    # Environments in the repo), which has a required-reviewer rule
+    # attached. That environment has to be created by hand first - this
+    # line alone does nothing until it exists. See DEPLOYMENT.md.
+    environment: production
     steps:
       - uses: actions/checkout@v4   # mostly for a readable log entry - the actual
                                      # deploy pulls fresh code on the server itself, below
