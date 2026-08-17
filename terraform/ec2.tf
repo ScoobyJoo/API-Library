@@ -37,11 +37,18 @@ resource "aws_instance" "app" {
   vpc_security_group_ids = [aws_security_group.app.id]
   key_name               = aws_key_pair.deployer.key_name
 
+  # Lets this instance assume the role defined in iam.tf, so it can fetch
+  # the real RDS password from Secrets Manager at boot (see step 5 in
+  # user_data.sh.tpl) instead of ever being handed it by Terraform.
+  iam_instance_profile = aws_iam_instance_profile.app.name
+
   user_data = templatefile("${path.module}/templates/user_data.sh.tpl", {
-    secret_key  = random_password.secret_key.result
-    db_password = random_password.db_password.result
-    repo_url    = var.repo_url
-    project_dir = var.project_dir_name
+    secret_key    = random_password.secret_key.result
+    db_host       = aws_db_instance.app.address
+    db_secret_arn = aws_db_instance.app.master_user_secret[0].secret_arn
+    region        = var.region
+    repo_url      = var.repo_url
+    project_dir   = var.project_dir_name
   })
 
   # user_data only runs on an instance's FIRST boot, not on every

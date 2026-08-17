@@ -30,11 +30,11 @@ terraform {
   # in by hand, copied from `terraform -chdir=bootstrap output` after
   # you've run the bootstrap config once - see DEPLOYMENT.md.
   backend "s3" {
-    bucket         = "api-library-tfstate-492613460331" # from: terraform -chdir=bootstrap output bucket_name
-    key            = "api-library/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "api-library-tfstate-lock"
-    encrypt        = true
+    bucket       = "api-library-tfstate-492613460331" # from: terraform -chdir=bootstrap output bucket_name
+    key          = "api-library/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }
 

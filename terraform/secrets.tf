@@ -1,18 +1,17 @@
-# Terraform generates these itself, once, the first time you run `apply`.
-# They live only in terraform.tfstate (local, gitignored, never committed)
-# and get written into the .env file on the EC2 instance via user_data -
-# they never touch GitHub, and you never have to type or remember them.
+# Terraform generates this itself, once, the first time you run `apply`.
+# It lives only in terraform.tfstate (local, gitignored, never
+# committed) and gets written into the .env file on the EC2 instance via
+# user_data - it never touches GitHub, and you never have to type or
+# remember it.
+#
+# The database password used to be generated the same way, by a sibling
+# random_password.db_password resource here - it's gone now that
+# rds.tf uses manage_master_user_password = true instead, which has AWS
+# generate and store the real master password in Secrets Manager. The
+# EC2 instance fetches that real password at boot instead (see
+# templates/user_data.sh.tpl step 5 and iam.tf).
 
 resource "random_password" "secret_key" {
   length  = 64
-  special = false
-}
-
-resource "random_password" "db_password" {
-  length = 24
-  # special = false: this password gets embedded directly into a
-  # postgresql://user:PASSWORD@host/db connection URL. Special characters
-  # like @, /, or : would need URL-encoding there and could break parsing -
-  # keeping it alphanumeric avoids that whole problem.
   special = false
 }

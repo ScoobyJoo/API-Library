@@ -5,9 +5,11 @@ services:
     environment:
       POSTGRES_USER: postgres
       # ${VAR:-default} falls back to "postgres" if no .env file sets
-      # POSTGRES_PASSWORD, so local `docker compose up` keeps working
-      # out of the box with no setup. Production (EC2) always provides a
-      # real value via its own .env, written by Terraform.
+      # POSTGRES_PASSWORD, so local `docker compose up` keeps working out
+      # of the box with no setup. This file (and this local-only db
+      # service) is local dev only now - production runs
+      # docker-compose.prod.yml instead, which has no db service at all
+      # since it uses AWS RDS (see terraform/rds.tf).
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: library
     volumes:

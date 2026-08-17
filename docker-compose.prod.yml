@@ -1,0 +1,24 @@
+# Production-only compose file, used on the EC2 instance instead of
+# docker-compose.yml (invoked as `docker compose -f docker-compose.prod.yml
+# up -d --build`, NOT merged with the base file). It contains only the
+# "web" service - there's no "db" service here at all, because production
+# now uses AWS RDS (see terraform/rds.tf), not a local Postgres container.
+#
+# Local development is unaffected: `docker compose up` (no -f flag) still
+# reads docker-compose.yml, which is unchanged and still runs its own
+# local "db" container.
+services:
+  web:
+    build: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY:-}
+      FLASK_DEBUG: ${FLASK_DEBUG:-0}
+    ports:
+      - "5000:5000"
+    # init_db.py creates tables (idempotent) before the server starts -
+    # same as the local compose file. No `depends_on` needed here since
+    # there's no local "db" service to wait on; RDS is already running
+    # and reachable by the time this container starts.
+    command: >
+      sh -c "python init_db.py && python -m flask --app wsgi run --host=0.0.0.0 --port=5000"

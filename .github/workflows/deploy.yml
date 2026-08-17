@@ -28,4 +28,4 @@ jobs:
           script: |
             cd /home/ec2-user/API-Library
             git pull
-            docker compose up -d --build
+            docker compose -f docker-compose.prod.yml up -d --build

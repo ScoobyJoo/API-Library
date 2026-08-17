@@ -50,16 +50,72 @@ chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 # --- 4. Clone the app repo ---
 sudo -u ec2-user git clone ${repo_url} /home/ec2-user/${project_dir}
 
-# --- 5. Write the .env file docker-compose.yml reads via $${VAR} substitution ---
+# --- 4b. Install AWS CLI v2 and jq ---
+# Same "install the binary directly" pattern already needed for Docker
+# Compose and Buildx above - AL2023's dnf-packaged `awscli` is old/
+# unreliable, so this uses AWS's own documented cross-distro install
+# method instead. `unzip` is required to extract it and isn't included
+# on AL2023 by default. `jq` (a command-line JSON parser) IS reliably
+# available via dnf here, unlike the other three - it's only needed
+# below, to pull the "password" field back out of the JSON blob Secrets
+# Manager returns.
+dnf install -y unzip jq
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+./aws/install
+
+# --- 5. Fetch the REAL master password from Secrets Manager ---
+# rds.tf's manage_master_user_password = true means Terraform never
+# generates or even sees the actual database password - AWS creates it,
+# encrypts it, and stores it in Secrets Manager. This instance can read
+# ONLY that one secret because of the IAM role attached above via
+# iam_instance_profile (see iam.tf) - the AWS CLI picks up permission to
+# make this call automatically from that role's temporary credentials,
+# no access keys stored anywhere on this box.
+#
+# --region is passed explicitly rather than relying on the AWS CLI to
+# infer it from instance metadata - that auto-detection isn't reliably
+# on by default, so being explicit here avoids a flaky, hard-to-diagnose
+# failure mode.
+SECRET_JSON=$(aws secretsmanager get-secret-value \
+  --secret-id ${db_secret_arn} \
+  --region ${region} \
+  --query SecretString \
+  --output text)
+DB_PASSWORD=$(echo "$SECRET_JSON" | jq -r .password)
+
+# --- 6. Write the .env file docker-compose.prod.yml reads via $${VAR} substitution ---
+# No POSTGRES_PASSWORD here anymore - production doesn't run its own
+# Postgres container (docker-compose.prod.yml only has the "web" service),
+# so there's nothing local to configure. DATABASE_URL instead points at
+# the AWS-managed RDS database, over SSL (?sslmode=require) -
+# psycopg2-binary (already in requirements.txt) supports this natively.
+#
+# IMPORTANT: $${DB_PASSWORD} below uses the same double-$ escaping as
+# $${BUILDX_VERSION} earlier in this file, but for a different reason
+# than the header comment at the top describes. ${secret_key}, ${db_host},
+# ${db_secret_arn}, and ${region} above are Terraform-time values -
+# templatefile() fills those in before this script ever reaches EC2.
+# DB_PASSWORD is the opposite: a genuine bash variable that doesn't exist
+# until THIS SCRIPT runs, on the instance, at boot - Terraform has never
+# heard of it. Writing it as $${DB_PASSWORD} tells Terraform "leave this
+# alone, render it as a literal $${DB_PASSWORD}", which bash then expands
+# for real when this heredoc executes. Writing it with only one $ instead
+# would make templatefile() try to substitute ITS OWN "DB_PASSWORD"
+# variable, which doesn't exist, and fail at `terraform apply` time,
+# before this script ever ran.
 cat > /home/ec2-user/${project_dir}/.env <<EOF
 SECRET_KEY=${secret_key}
-POSTGRES_PASSWORD=${db_password}
-DATABASE_URL=postgresql+psycopg2://postgres:${db_password}@db:5432/library
+DATABASE_URL=postgresql+psycopg2://postgres:$${DB_PASSWORD}@${db_host}:5432/library?sslmode=require
 FLASK_DEBUG=0
 EOF
 chown ec2-user:ec2-user /home/ec2-user/${project_dir}/.env
 chmod 600 /home/ec2-user/${project_dir}/.env
 
-# --- 6. First build & start, so the site is live right after `terraform apply` ---
+# --- 7. First build & start, so the site is live right after `terraform apply` ---
+# -f docker-compose.prod.yml (instead of the bare `docker compose up`,
+# which would use docker-compose.yml) picks the production-only compose
+# file - just the "web" service, no local "db" container, since the
+# database is now RDS.
 cd /home/ec2-user/${project_dir}
-docker compose up -d --build
+docker compose -f docker-compose.prod.yml up -d --build

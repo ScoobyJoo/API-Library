@@ -6,14 +6,14 @@ This is written as a learning exercise, not just a runbook — read the explanat
 
 ## 1. What you're building
 
-One EC2 instance (a rented Linux virtual machine) running the exact same `docker-compose.yml` you already use locally, given a stable public IP address so it's reachable on the internet on port 5000. When you push to `main`, GitHub Actions SSHes into that machine, pulls your latest code, and restarts the containers — after you manually approve the deploy (see section 8).
+One EC2 instance (a rented Linux virtual machine) running the app via Docker Compose, given a stable public IP address so it's reachable on the internet on port 5000, backed by a managed AWS RDS Postgres database. When you push to `main`, GitHub Actions SSHes into that machine, pulls your latest code, and restarts the app container — after you manually approve the deploy (see section 8).
 
 ## 2. Glossary
 
 A few AWS/Terraform terms used below, in plain language:
 
 - **Default VPC** — every AWS account already has one "Virtual Private Cloud" (an isolated network) per region, pre-configured and ready to use. We use the one that's already there instead of building a custom network.
-- **Security group** — a firewall attached to the instance. Nothing gets in unless a rule explicitly allows it.
+- **Security group** — a firewall attached to an instance or database. Nothing gets in unless a rule explicitly allows it.
 - **EC2 instance** — the actual virtual machine your app runs on.
 - **Elastic IP** — a public IP address you reserve, which stays the same even if the instance is replaced. Without one, the server's address could change every time you run `terraform apply`.
 - **Key pair** — an SSH key pair (a private key you keep secret, a public key AWS stores) used to log into the instance instead of a password.
@@ -21,11 +21,15 @@ A few AWS/Terraform terms used below, in plain language:
 - **Terraform state** (`terraform.tfstate`) — a file Terraform keeps to track what it created, including real secrets (see section 5). It lives in an S3 bucket, not as a local file on your machine — see section 5 for why and how that's set up.
 - **Remote backend** — instead of Terraform's default (a state file that only exists on your laptop), a remote backend stores state somewhere shared and durable — here, an S3 bucket — so anyone with access can run Terraform against the same infrastructure, and it's backed up instead of being a single point of failure.
 - **State locking** — a safeguard that stops two `terraform apply`/`destroy` runs from happening at the same time and corrupting the state file. Here it's implemented with a small DynamoDB table.
+- **RDS (Relational Database Service)** — AWS's managed Postgres offering. AWS handles the server, patching, and backups for the database, instead of it running in a container you manage yourself.
+- **DB subnet group** — tells RDS which of the VPC's subnets it's allowed to place the database in. Similar idea to a security group, but for subnet placement rather than firewall rules.
+- **IAM role** — an identity AWS resources (not people) can "assume" to gain a specific, limited set of permissions. This project's EC2 instance assumes a role that grants exactly one thing: permission to read one specific secret from Secrets Manager (see `terraform/iam.tf`).
+- **Instance profile** — the container an EC2 instance actually attaches to pick up an IAM role's permissions; EC2 can't attach a role directly, only an instance profile wrapping one role. A fixed AWS API requirement, not a design choice made here.
 
 ## 3. Trade-offs made here (read this before you're surprised later)
 
-- **No managed database (RDS).** Postgres runs in a container on the same EC2 instance, exactly like local dev. This means the database's data lives on that instance's disk — if the instance is ever replaced (e.g. because `user_data` changed), **the data is lost**. Fine for a learning project with no real data; a real production setup would use RDS instead. That's a natural next step once you're comfortable with what's here.
-- **No container registry (ECR).** Deploying doesn't build a Docker image and push it anywhere — GitHub Actions just SSHes into the server and rebuilds the image from source there (`docker compose up -d --build`), the same way you'd do it locally. Simpler and needs zero AWS credentials in GitHub, but slower per deploy since it rebuilds from scratch every time. Also a natural next step later.
+- **Single-AZ RDS (not Multi-AZ).** The database runs on AWS RDS — a managed Postgres service — rather than in a container on the EC2 instance, so replacing the instance no longer destroys your data, and backups/patching are handled for you. But this project uses a *single-AZ* RDS instance (no automatic standby copy in a second data center) to stay free-tier-eligible and simple. If that Availability Zone has an outage, the database is unreachable until AWS recovers it. A real production setup would enable Multi-AZ for automatic failover — a natural next step once you're comfortable with what's here.
+- **No container registry (ECR).** Deploying doesn't build a Docker image and push it anywhere — GitHub Actions just SSHes into the server and rebuilds the image from source there (`docker compose -f docker-compose.prod.yml up -d --build`), the same way you'd do it locally. Simpler and needs zero AWS credentials in GitHub, but slower per deploy since it rebuilds from scratch every time. A natural next step later.
 - **No load balancer, no HTTPS, no custom domain.** You'll access the app over plain HTTP at `http://<ip>:5000`.
 - **The `/admin` section still has no authentication at all** (a separate, pre-existing limitation of this app, not something introduced by deploying it) — deploying to a public server makes this more consequential than running it locally, since it's now reachable by anyone who finds the IP.
 
@@ -40,8 +44,10 @@ A few AWS/Terraform terms used below, in plain language:
    ssh-keygen -t ed25519 -f ~/.ssh/api-library
    ```
    This creates `~/.ssh/api-library` (private — never share this) and `~/.ssh/api-library.pub` (public — Terraform uploads this one to AWS).
-6. **Find your own public IP** (search "what is my ip") — you'll need it as `allowed_ssh_cidr` below, as `<your-ip>/32`.
-7. **Attach S3 and DynamoDB permissions to your IAM user.** Terraform now needs to read/write an S3 bucket and a DynamoDB table to manage its own state (see section 5). In the AWS Console: IAM → Users → your user → Add permissions → attach `AmazonS3FullAccess` and `AmazonDynamoDBFullAccess`, the same way you attached `AmazonEC2FullAccess` in step 2.
+6. **Attach S3 and DynamoDB permissions to your IAM user.** Terraform needs to read/write an S3 bucket and a DynamoDB table to manage its own state (see section 5). In the AWS Console: IAM → Users → your user → Add permissions → attach `AmazonS3FullAccess` and `AmazonDynamoDBFullAccess`, the same way you attached `AmazonEC2FullAccess` in step 2.
+7. **Attach RDS permissions to your IAM user.** Terraform also needs to create/manage the database. Same place: attach `AmazonRDSFullAccess`.
+8. **Attach IAM permissions to your IAM user.** Terraform also creates an IAM role/policy/instance profile for the EC2 instance (see `terraform/iam.tf`) so it can fetch the real database password from Secrets Manager at boot. Creating those requires `iam:CreateRole`, `iam:PutRolePolicy`, `iam:CreateInstanceProfile`, `iam:AddRoleToInstanceProfile`, and — critically — `iam:PassRole` (needed to actually attach that role to the EC2 instance), none of which the policies attached in earlier steps grant. Same place: attach `IAMFullAccess`.
+9. **Attach Secrets Manager permissions to your IAM user.** `rds.tf`'s `manage_master_user_password = true` means RDS creates a secret in Secrets Manager *on your behalf* during `terraform apply` — that's a separate permission from the EC2 role's later ability to just *read* that secret (see `iam.tf`). `AmazonRDSFullAccess` doesn't cover it. Same place: attach `SecretsManagerReadWrite`.
 
 ## 5. Setting up remote state storage (once)
 
@@ -78,16 +84,17 @@ Terraform will notice the new backend block and ask whether to migrate existing 
 ```
 cd terraform
 terraform init
-terraform plan  -var="allowed_ssh_cidr=YOUR_IP/32" -var="ssh_public_key_path=~/.ssh/api-library.pub"
-terraform apply -var="allowed_ssh_cidr=YOUR_IP/32" -var="ssh_public_key_path=~/.ssh/api-library.pub"
+terraform plan  -var="ssh_public_key_path=~/.ssh/api-library.pub"
+terraform apply -var="ssh_public_key_path=~/.ssh/api-library.pub"
 ```
 
 `terraform init` downloads the AWS/random providers. `terraform plan` shows you exactly what it's about to create, with no changes made yet — always worth reading before `apply`. `terraform apply` asks for confirmation, then actually creates everything.
 
-Tip: instead of typing the two `-var` flags every time, create a `terraform/terraform.tfvars` file (already gitignored, since it'll contain your IP):
+**Heads up:** this `apply` takes noticeably longer than you might expect — RDS instances commonly take 5–15 minutes to provision, versus under a minute for the EC2 instance itself. This isn't the terminal hanging (unlike an earlier incident where a security-group replacement genuinely got stuck) — it's real progress; check the RDS console (RDS → Databases) if you want to watch the status move from "Creating" to "Available". The EC2 instance automatically waits for the database to exist first, because its startup script needs the database's address — Terraform figures this ordering out on its own from that reference, no manual configuration needed.
+
+Tip: instead of typing the `-var` flag every time, create a `terraform/terraform.tfvars` file (already gitignored):
 ```
-allowed_ssh_cidr     = "YOUR_IP/32"
-ssh_public_key_path  = "~/.ssh/api-library.pub"
+ssh_public_key_path = "~/.ssh/api-library.pub"
 ```
 Terraform reads that automatically — then you can just run `terraform plan` / `terraform apply` with no flags.
 
@@ -123,7 +130,7 @@ cd terraform
 terraform destroy
 ```
 
-This deletes everything Terraform created — including the database container and its data (see the trade-off above). It's the way to make sure you're not paying for anything once you're done experimenting; there's nothing left running afterward.
+This deletes everything Terraform created — including the RDS database instance and all its data, immediately and with no final snapshot (see the trade-offs above — this project intentionally treats the database as disposable, not something holding real data). It's the way to make sure you're not paying for anything once you're done experimenting; there's nothing left running afterward.
 
 Note this only tears down the main config — it does **not** delete the S3 bucket/DynamoDB table from `terraform/bootstrap/` (and shouldn't; that bucket has `force_destroy` disabled specifically so it can't be deleted while it still holds your state). If you truly want everything gone, empty the bucket by hand first, then `cd terraform/bootstrap && terraform destroy`.
 

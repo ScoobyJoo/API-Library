@@ -15,11 +15,16 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-# Determines who is allowed to us SSH
-variable "allowed_ssh_cidr" {
-  description = "CIDR block allowed to SSH into the instance on port 22, e.g. \"203.0.113.4/32\" (your own public IP with /32). Never set this to \"0.0.0.0/0\" - that lets anyone on the internet attempt to log in to your server."
-  type        = string
-}
+# Unused as of the fix that opened SSH to everyone (GitHub Actions
+# runners have no stable IP to allowlist) - security_group.tf's SSH rule
+# is now a hardcoded 0.0.0.0/0, not var.allowed_ssh_cidr. Left here,
+# commented out, instead of deleted in case SSH access ever gets
+# restricted to a real IP range again later.
+#
+# variable "allowed_ssh_cidr" {
+#   description = "CIDR block allowed to SSH into the instance on port 22, e.g. \"203.0.113.4/32\" (your own public IP with /32). Never set this to \"0.0.0.0/0\" - that lets anyone on the internet attempt to log in to your server."
+#   type        = string
+# }
 
 variable "ssh_public_key_path" {
   description = "Path to the PUBLIC half of an SSH key pair you generate yourself with `ssh-keygen` (e.g. ~/.ssh/api-library.pub). Terraform uploads this to AWS; it never sees or generates your private key."
